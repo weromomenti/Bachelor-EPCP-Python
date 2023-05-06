@@ -1,13 +1,13 @@
 import librosa
 import numpy as np
-
+from scipy import signal
 
 def compute_hps(cqt, N=3):
-    returnCqt = np.ones_like(cqt)
+    returnCqt = np.copy(cqt)
 
-    for n in range(N+1):
-        downsampledCqt = cqt[::, ::2**n]
-        downsampledCqt = np.pad(downsampledCqt, ((0, 0), (0, cqt.shape[1] - downsampledCqt.shape[1])))
-        returnCqt *= downsampledCqt
+    for n in range(1, N+1):
+        downsampledCqt = cqt[:, ::2**n]
+        downsampledCqt = np.repeat(a=downsampledCqt, repeats=2**n, axis=1)
+        returnCqt *= downsampledCqt[:, :len(returnCqt[0])]
 
     return returnCqt

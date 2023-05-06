@@ -1,3 +1,4 @@
+from matplotlib.animation import FuncAnimation
 import pyaudio
 import wave
 import numpy as np
@@ -9,68 +10,40 @@ import scipy.ndimage
 import soundfile as sf
 from match_chords import match_chords
 import hps
+from plot import plot
 
-def process():
+def process(y, sr):
 
-    y, sr = sf.read('CantinaBand60.wav', dtype='float32')
-    y = y.T
-    y = librosa.resample(y=y, orig_sr=sr, target_sr=22050)
-    plots = 5
+    #y, sr = librosa.load('StarWars60.wav', offset=10, duration=10)
 
-    #y = librosa.effects.preemphasis(y)
     #y = librosa.util.normalize(y)
+    #y = librosa.effects.preemphasis(y)
 
-    harmonic = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=1024)
+    #harmonic1 = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=1024)
+    #plot(harmonic, 'Original Signal With Percussion', plots)
 
-    plt.figure(figsize=(20, 8))
+    #downsampled = hps.compute_hps(harmonic1)
+    #plot(downsampled, 'Original Signal with HPS', plots)
+    #harmonic2 = vocalSeperation(y, sr)
 
-    plt.subplot(plots, 1, 1)
-    librosa.display.specshow(harmonic, y_axis='chroma', x_axis='time', sr=sr, hop_length=1024)
-    plt.colorbar()
-    plt.title('Original Signal With Percussion')
-    plt.tight_layout()
+    y_harmonic, y_percussive = librosa.effects.hpss(y)
 
-    downsampled = hps.compute_hps(harmonic)
+    tempo = 60.0 / librosa.feature.tempo(y=y_percussive, sr=sr)
 
-    plt.subplot(plots, 1, 2)
-    librosa.display.specshow(downsampled, y_axis='chroma', x_axis='time', sr=sr, hop_length=1024)
-    plt.colorbar()
-    plt.title('Downsampled (Work in Progress)')
-    plt.tight_layout()
-
-    y_harmonic, y_percussive = librosa.effects.hpss(y, margin=8)
-    print(librosa.feature.tempo(y=y_percussive, sr=sr))
-
-    harmonic = librosa.feature.chroma_cqt(y=y_harmonic, sr=sr, hop_length=1024)
-
-    plt.subplot(plots, 1, 3)
-    librosa.display.specshow(harmonic, y_axis='chroma', x_axis='time', sr=sr, hop_length=1024)
-    plt.colorbar()
-    plt.title('Chroma CQT')
-    plt.tight_layout()
-
-    harmonic = np.minimum(harmonic, librosa.decompose.nn_filter(harmonic, aggregate=np.average, metric='cosine'))
-
-    plt.subplot(plots, 1, 4)
-    librosa.display.specshow(harmonic, y_axis='chroma', x_axis='time', sr=sr, hop_length=1024)
-    plt.colorbar()
-    plt.title('Non-local Filtered')
-    plt.tight_layout()
-
-    harmonic = scipy.ndimage.median_filter(harmonic, size=(1,9))
-    #harmonic = hps.compute_hps(harmonic)
-
-    plt.subplot(plots, 1, 5)
-    librosa.display.specshow(harmonic, y_axis='chroma', x_axis='time', sr=sr, hop_length=1024)
-    plt.title('Horizontal-median Filtered')
-    #plt.xticks((0, 30))
-    plt.colorbar()
-    plt.tight_layout()
-
-    plt.show()
-
-    #match_chords(harmonic)
+    # sf.write('harmonic.wav', y_harmonic, sr)
+    # sf.write('percussive.wav', y_percussive, sr)
+    # print(librosa.feature.tempo(y=y_percussive, sr=sr))
 
 
-if __name__ == "__main__":
-    process()
+    harmonic2 = librosa.feature.chroma_cqt(y=y_harmonic, sr=sr, hop_length=1024, fmin=96)
+    harmonic2 = hps.compute_hps(harmonic2)
+
+    #plot(harmonic, 'Chroma CQT', plots)
+
+    # harmonic = np.minimum(harmonic, librosa.decompose.nn_filter(harmonic, aggregate=np.median, metric='cosine'))
+    # plot(harmonic, 'Non-local Filtered', plots)
+
+    # harmonic = scipy.ndimage.median_filter(harmonic, size=(1,9))
+    # plot(harmonic, 'Horizontal-median Filtered', plots)
+
+    return (harmonic2, tempo)

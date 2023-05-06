@@ -1,45 +1,96 @@
 import pyaudio
 import wave
 import process
+import sounddevice as sd
+from matplotlib.animation import FuncAnimation
+import matplotlib.pyplot as plt
+import numpy as np
+import librosa
+import pyqtgraph as pg
+from PyQt5 import QtWidgets
+import sys
+import soundcard as sc
 
-# set the audio parameters
-FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 44100
-CHUNK = 1024
-RECORD_SECONDS = 5
-WAVE_OUTPUT_FILENAME = "output.wav"
+def record_system_sound(duration, sr):
+    with sc.get_microphone(id=str(sc.default_speaker().name), include_loopback=True).recorder(samplerate=sr) as mic:
+        data = mic.record(numframes=sr*duration)
 
-# create the audio object
-audio = pyaudio.PyAudio()
+    return data.flatten()
 
-# open the microphone stream
-# stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+def update_plot():
+    global duration
 
-# print("Recording...")
+    audio_chunk = record_system_sound(duration, sr)
+    (chroma, stuff) = process.process(audio_chunk, sr)
 
-# # create an empty list to store the audio data
-# audio_data = []
+def index_to_chord(index):
+    notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
+             'c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b']
+    return notes[index]
 
-# # record audio for a fixed number of seconds
-# for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
-#     data = stream.read(CHUNK)
-#     audio_data.append(data)
+def plot_code():
+    app = QtWidgets.QApplication(sys.argv)
+    win = pg.GraphicsLayoutWidget(show=True)
+    win.setWindowTitle('Chroma CQT Real-Time Visualization')
+    plot = win.addPlot(title="Chroma CQT")
+    img = pg.ImageItem()
+    plot.addItem(img)
+    plot.setAspectLocked(True)
+    #plot.invertY(True)  # Invert Y-axis to match the 'lower' origin
 
-# print("Finished recording.")
+    # Set colormap
+    cmap = pg.colormap.get('viridis')
+    lut = cmap.getLookupTable(0.0, 1.0, 256)
+    img.setLookupTable(lut)
+    img.setLevels([0, 1])
 
-# # stop the stream and close the audio object
-# stream.stop_stream()
-# stream.close()
-# audio.terminate()
+    # Set axis labels
+    plot.setLabel('left', 'Chroma')
+    plot.setLabel('bottom', 'Time')
 
-# # save the audio data to a WAV file
-# wavefile = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
-# wavefile.setnchannels(CHANNELS)
-# wavefile.setsampwidth(audio.get_sample_size(FORMAT))
-# wavefile.setframerate(RATE)
-# wavefile.writeframes(b''.join(audio_data))
-# wavefile.close()
+    # Update plot in real-time
+    timer = pg.QtCore.QTimer()
+    timer.timeout.connect(update_plot)
+    timer.start(int(duration * 1000))
 
-process.process()
+    # Start the Qt event loop
+    sys.exit(app.exec_())
+
+def sum_elements(arr):
+    result = []
+    # sum majors
+    for i in range(len(arr)):
+        sum_value = arr[i] + arr[(i + 4) % len(arr)] + arr[(i + 7) % len(arr)]
+        result.append(sum_value)
+    
+    # sum minors
+    for i in range(len(arr)):
+        sum_value = arr[i] + arr[(i + 3) % len(arr)] + arr[(i + 7) % len(arr)]
+        result.append(sum_value)
+
+    return result
+
+def main():
+    global duration, sr
+
+    duration = 0.1  # Record duration in seconds for each chunk
+    sr = 48000  # Sample rate
+
+    try:
+        while True:
+            frame = record_system_sound(duration, sr)
+            (frame, bpm) = process.process(frame, sr)
+            row_sums = np.sum(frame, axis=1)
+
+            summed = sum_elements(row_sums)
+            maxIndex = np.argmax(summed)
+
+            print(index_to_chord(maxIndex))
+
+    except KeyboardInterrupt:
+        print("Stopped")
+    
+if __name__ == '__main__':
+    main()
+
 
