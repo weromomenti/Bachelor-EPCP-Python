@@ -1,14 +1,13 @@
-import pyaudio
-import wave
+import time
 import process
 import sounddevice as sd
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import numpy as np
-import librosa
 import pyqtgraph as pg
 from PyQt5 import QtWidgets
 import sys
+from serial import Serial
 import soundcard as sc
 
 def record_system_sound(duration, sr):
@@ -73,21 +72,49 @@ def sum_elements(arr):
 def main():
     global duration, sr
 
+    COM_PORT = 'COM8'
+
     duration = 0.1  # Record duration in seconds for each chunk
     sr = 48000  # Sample rate
+
+    #ser = Serial(COM_PORT, baudrate=9600)
+    time.sleep(2)
+
+    currentChord = ""
+    prevChord = ""
+    chords = []
 
     try:
         while True:
             frame = record_system_sound(duration, sr)
             (frame, bpm) = process.process(frame, sr)
+            bpm = int(bpm)
             row_sums = np.sum(frame, axis=1)
 
             summed = sum_elements(row_sums)
             maxIndex = np.argmax(summed)
 
-            print(index_to_chord(maxIndex))
+            if (summed[maxIndex] < 5):
+                continue
+            
+            currentChord = index_to_chord(maxIndex)
+            chords.append(currentChord)
+
+            if (len(set(chords)) != 1):
+                chords = []
+                chords.append(currentChord)
+            
+            if len(chords) == 3 and len(set(chords)) == 1:
+                if (prevChord != currentChord):
+                    #ser.write(currentChord.encode())
+                    chords = []
+                    chords.append(currentChord)
+                prevChord = currentChord
+
+            print(currentChord)
 
     except KeyboardInterrupt:
+        #ser.close()
         print("Stopped")
     
 if __name__ == '__main__':

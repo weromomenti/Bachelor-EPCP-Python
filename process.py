@@ -28,14 +28,14 @@ def process(y, sr):
 
     y_harmonic, y_percussive = librosa.effects.hpss(y)
 
-    tempo = 60.0 / librosa.feature.tempo(y=y_percussive, sr=sr)
+    tempo = librosa.feature.tempo(y=y_percussive, sr=sr)
 
     # sf.write('harmonic.wav', y_harmonic, sr)
     # sf.write('percussive.wav', y_percussive, sr)
     # print(librosa.feature.tempo(y=y_percussive, sr=sr))
 
 
-    harmonic2 = librosa.feature.chroma_cqt(y=y_harmonic, sr=sr, hop_length=1024, fmin=96)
+    harmonic2 = librosa.feature.chroma_cqt(y=y_harmonic, sr=sr, hop_length=1024)
     harmonic2 = hps.compute_hps(harmonic2)
 
     #plot(harmonic, 'Chroma CQT', plots)
